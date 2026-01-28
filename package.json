@@ -1,0 +1,13 @@
+{
+  "name": "mocha-xray-junit-reporter",
+  "version": "1.0.0",
+  "description": "Mocha reporter that generates Xray-compatible JUnit XML with CDATA properties",
+  "author": "Gergo Adanyi <gergo.adanyi@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/mocha-xray-junit-reporter.git"
+  },
+  "keywords": ["mocha", "reporter", "xray", "junit", "xml", "jira", "test-automation"],
+  "license": "MIT"
+}
+
