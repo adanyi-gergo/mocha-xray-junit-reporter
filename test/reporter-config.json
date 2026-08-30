@@ -1,0 +1,8 @@
+{
+  "reporterEnabled": "spec, index.js",
+  "indexJsReporterOptions": {
+    "output": "./test-results/junit.xml",
+    "stripTags": "true",
+    "saveTags": "true"
+  }
+}

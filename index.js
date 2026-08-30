@@ -16,9 +16,10 @@ function XrayJUnitReporter(runner, options) {
   var tests = [];
   var suites = {};
   var currentSuite = null;
+  var reporterOptions = options?.reporterOptions || {};
   
   // Get output file from options
-  var output = (options.reporterOptions && options.reporterOptions.output) || './junit.xml';
+  var output = reporterOptions.output || './junit.xml';
 
   runner.on('suite', function(suite) {
     if (suite.root) return;
@@ -34,17 +35,17 @@ function XrayJUnitReporter(runner, options) {
   });
 
   runner.on('pass', function(test) {
-    var testData = createTestData(test, 'passed');
+    var testData = createTestData(test, 'passed', undefined, reporterOptions);
     suites[currentSuite].tests.push(testData);
   });
 
   runner.on('fail', function(test, err) {
-    var testData = createTestData(test, 'failed', err);
+    var testData = createTestData(test, 'failed', err, reporterOptions);
     suites[currentSuite].tests.push(testData);
   });
 
   runner.on('pending', function(test) {
-    var testData = createTestData(test, 'skipped');
+    var testData = createTestData(test, 'skipped', undefined, reporterOptions);
     suites[currentSuite].tests.push(testData);
   });
 
@@ -53,9 +54,48 @@ function XrayJUnitReporter(runner, options) {
   });
 }
 
-function createTestData(test, status, err) {
+var ALLOWED_TAG_PREFIXES = ['@', '#', '+', ':', '~', '!'];
+
+function parseBool(value, defaultValue) {
+  if (value === undefined || value === null || value === '') return defaultValue;
+  return value === true || value === 'true';
+}
+
+function resolveTagPrefix(value = '@') {
+  return ALLOWED_TAG_PREFIXES.includes(value) ? value : '@';
+}
+
+function processTitle(title, reporterOptions) {
+  var stripTags = parseBool(reporterOptions.stripTags, false);
+  var saveTags = parseBool(reporterOptions.saveTags, false);
+
+  if (!stripTags && !saveTags) {
+    return { title: title, tags: null };
+  }
+
+  var tagPrefix = resolveTagPrefix(reporterOptions.tagPrefix);
+  var tags = [];
+  var kept = [];
+  var parts = title.split(/\s+/);
+
+  for (var part of parts) {
+    if (part.indexOf(tagPrefix) === 0 && part.length > tagPrefix.length) {
+      tags.push(part.slice(tagPrefix.length));
+    } else if (part) {
+      kept.push(part);
+    }
+  }
+
+  return {
+    title: stripTags ? kept.join(' ') : title,
+    tags: tags.length ? tags : null
+  };
+}
+
+function createTestData(test, status, err, reporterOptions) {
+  var processed = processTitle(test.title, reporterOptions);
   var testData = {
-    title: test.title,
+    title: processed.title,
     fullTitle: test.fullTitle(),
     duration: test.duration || 0,
     status: status,
@@ -67,6 +107,10 @@ function createTestData(test, status, err) {
     test.properties.forEach(function(prop) {
       testData.properties[prop.name] = prop.value;
     });
+  }
+
+  if (parseBool(reporterOptions.saveTags, false) && processed.tags) {
+    testData.properties.tags = processed.tags.join(',');
   }
 
   if (err) {
@@ -136,9 +180,14 @@ XrayJUnitReporter.prototype.writeXml = function(suites, outputPath) {
       if (Object.keys(test.properties).length > 0) {
         lines.push('      <properties>');
         Object.keys(test.properties).forEach(function(propName) {
-          lines.push('        <property name="' + escapeXml(propName) + '">');
-          lines.push('          <![CDATA[' + test.properties[propName] + ']]>');
-          lines.push('        </property>');
+          var propValue = test.properties[propName];
+          if (propName === 'tags') {
+            lines.push('        <property name="tags" value="' + escapeXml(propValue) + '" />');
+          } else {
+            lines.push('        <property name="' + escapeXml(propName) + '">');
+            lines.push('          <![CDATA[' + propValue + ']]>');
+            lines.push('        </property>');
+          }
         });
         lines.push('      </properties>');
       }
@@ -191,11 +240,17 @@ XrayJUnitReporter.prototype.writeXml = function(suites, outputPath) {
 function escapeXml(str) {
   if (!str) return '';
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&apos;')
-    .replace(/'/g, '&apos;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
+
+XrayJUnitReporter.parseBool = parseBool;
+XrayJUnitReporter.processTitle = processTitle;
+XrayJUnitReporter.resolveTagPrefix = resolveTagPrefix;
+XrayJUnitReporter.ALLOWED_TAG_PREFIXES = ALLOWED_TAG_PREFIXES;
+XrayJUnitReporter.escapeXml = escapeXml;
 
 module.exports = XrayJUnitReporter;
