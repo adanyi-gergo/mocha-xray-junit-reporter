@@ -110,6 +110,24 @@ The reporter generates JUnit XML with proper CDATA sections:
 </testsuites>
 ```
 
+## Test Tags
+
+Append tag tokens to test titles for Mocha filtering (e.g. `--grep @smoke`) without polluting Xray issue titles. Tags are space-separated and appended to the title, prefixed by a configurable character (default `@`).
+
+```javascript
+it("should successfully login with valid credentials @smoke @regression", async function () {
+  // test code
+});
+```
+
+Allowed `tagPrefix` values: `@`, `#`, `+`, `:`, `~`, `!` (others fall back to `@`).
+
+With `saveTags=true`, extracted tags are written as a Xray [test labels](https://docs.getxray.app/space/XRAYCLOUD/44564745/Taking+advantage+of+JUnit+XML+reports#Test-labels) property — plain label names, comma-separated, **without** the prefix:
+
+```xml
+<property name="tags" value="smoke,regression" />
+```
+
 ## Configuration Options
 
 Reporter options can be passed via `--reporter-options`:
@@ -117,11 +135,14 @@ Reporter options can be passed via `--reporter-options`:
 | Option | Description | Default |
 |--------|-------------|---------|
 | `output` | Path to output XML file | `./junit.xml` |
+| `stripTags` | Remove tag tokens from testcase titles in the report | `false` |
+| `saveTags` | Write extracted tags to a `tags` property | `false` |
+| `tagPrefix` | Prefix character for tag tokens (`@`, `#`, `+`, `:`, `~`, `!`) | `@` |
 
 Example:
 
 ```bash
-mocha --reporter mocha-xray-junit-reporter --reporter-options output=./test-results/results.xml
+mocha --reporter mocha-xray-junit-reporter --reporter-options output=./test-results/results.xml,stripTags=true,saveTags=true
 ```
 
 ## Xray Integration Tips
@@ -133,6 +154,16 @@ mocha --reporter mocha-xray-junit-reporter --reporter-options output=./test-resu
 - `test_key` - Existing Xray test key
 - `requirement` - Requirement ticket ID
 - `priority` - Test priority
+- `tags` - Jira labels (via `saveTags=true`, or set manually on `this.test.properties`)
+
+## Development
+
+```bash
+npm test                  # spec output + JUnit report (test/reporter-config.json)
+npm run test:reporter-only  # local index.js reporter only
+```
+
+Test output is written to `./test-results/junit.xml` (gitignored). When using this package locally as the reporter, use `index.js` — not `./index.js` (Mocha resolves that to its own CLI module).
 
 ## Troubleshooting
 
@@ -142,7 +173,7 @@ Make sure you're using the JUnit import endpoint in Xray, not the standard JUnit
 
 ### Special Characters in Properties
 
-All property values are automatically wrapped in CDATA sections, so special characters (like `<`, `>`, `&`) are handled correctly.
+All property values are automatically wrapped in CDATA sections, so special characters (like `<`, `>`, `&`) are handled correctly. The `tags` property uses a `value` attribute instead; titles and tag values are XML-escaped automatically.
 
 ## Contributing
 
@@ -150,9 +181,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Run `npm test`
+4. Commit your changes (`git commit -m 'Add some amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## License
 
